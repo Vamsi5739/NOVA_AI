@@ -2,9 +2,7 @@ import streamlit as st
 import google.generativeai as genai
 
 # Load API key securely
-with open(r"C:\Users\VamshiKrishnaKollima\Desktop\LLM\NOVA_AI\API Key.txt", "r") as f:
-    key = f.read().strip()
-
+key = st.secrets["GEMINI_API_KEY"]  
 genai.configure(api_key=key)
 
 # Define system prompt for AI behavior
