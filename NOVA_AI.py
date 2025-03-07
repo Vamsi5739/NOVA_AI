@@ -1,52 +1,67 @@
 import streamlit as st
 import google.generativeai as genai
+import requests
 
-# Load API key securely
-key = st.secrets["GEMINI_API_KEY"]  
-genai.configure(api_key=key)
+# Load API Key and Search Engine ID from Streamlit Secrets
+GOOGLE_SEARCH_API_KEY = st.secrets["GOOGLE_SEARCH_API_KEY"]
+SEARCH_ENGINE_ID = st.secrets["SEARCH_ENGINE_ID"]
 
-# Define system prompt for AI behavior
-sys_prompt = """You are an AI Code Reviewer specializing in assessing code for correctness, efficiency, readability, and best practices. Your primary responsibilities include:
+# Initialize Gemini AI
+genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+Gemini = genai.GenerativeModel(model_name="gemini-1.5-flash")
 
-1. **Code Review & Feedback**  
-   - Analyze the provided code for logical correctness and adherence to programming standards.  
-   - Identify potential issues such as syntax errors, logical bugs, or missing edge case handling.  
+# System Prompt
+sys_prompt = """You are an AI that provides code reviews and real-time answers.
+For coding:
+- Review for correctness, efficiency, readability, and security.
+- Suggest improvements and best practices.
 
-2. **Performance Optimization**  
-   - Suggest improvements to enhance execution speed and resource efficiency.  
-   - Identify performance bottlenecks and recommend better algorithms or data structures where applicable.  
-
-3. **Readability & Maintainability**  
-   - Evaluate the clarity and organization of the code.  
-   - Recommend improvements such as proper variable naming, code structuring, and documentation practices.  
-
-4. **Security & Best Practices**  
-   - Detect potential security vulnerabilities, such as SQL injections, improper input handling, or weak authentication mechanisms.  
-   - Ensure compliance with industry best practices for secure and reliable code.  
-
-### **Guidelines for Response:**  
-- Provide **clear, constructive, and actionable** feedback.  
-- Offer **alternative solutions** or examples to illustrate suggested improvements.  
-- Maintain a **professional, supportive, and encouraging tone** to help developers improve their coding skills.  
-- If the input is **not a valid code snippet**, politely request a relevant code sample for review.  
-
-Your goal is to assist developers in refining their code while fostering a learning-oriented environment."""
-
-
-# Initialize Gemini model
-Gemini = genai.GenerativeModel(model_name="gemini-1.5-flash", system_instruction=sys_prompt)
+For real-time information:
+- Use Google Search API when necessary.
+- Summarize the latest and most relevant information.
+"""
 
 # Streamlit UI
-st.title("NOVA - AI")
+st.title("NOVA-AI")
+
+# User Input
 user_input = st.text_area(label="", placeholder="Ask Me Something...")
 
+# Function to fetch real-time data from Google Search API
+def fetch_real_time_data(query):
+    search_url = "https://www.googleapis.com/customsearch/v1"
+    params = {
+        "q": query,
+        "key": GOOGLE_SEARCH_API_KEY,
+        "cx": SEARCH_ENGINE_ID
+    }
+    
+    response = requests.get(search_url, params=params)
+    
+    if response.status_code == 200:
+        results = response.json().get("items", [])
+        if results:
+            return results[0]["snippet"]  # Return the top search result snippet
+        else:
+            return "No relevant real-time data found."
+    return "Error fetching real-time information."
+
+# Submit Button
 if st.button("Submit"):
     if user_input.strip():
-        response = Gemini.generate_content(user_input)
-        if response and response.text:
-            st.subheader("Response:")
-            st.write(response.text)
+        # Check if the question requires real-time data
+        real_time_keywords = ["news", "weather", "stock", "latest", "live", "real-time"]
+        if any(keyword in user_input.lower() for keyword in real_time_keywords):
+            real_time_response = fetch_real_time_data(user_input)
+            st.subheader("Real-Time Data:")
+            st.write(real_time_response)
         else:
-            st.warning("No response generated. Please try again.")
+            response = Gemini.generate_content(user_input)
+            if response and response.text:
+                st.subheader("AI Response:")
+                st.write(response.text)
+            else:
+                st.warning("No response generated. Please try again.")
     else:
-        st.error("Please enter some code before submitting.")
+        st.error("Please enter a question or code before submitting.")
+
